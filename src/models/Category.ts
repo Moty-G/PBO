@@ -1,6 +1,7 @@
 import { BaseModel } from "./BaseModel.js";
+import { Searchable } from "../interfaces/Searchable.js";
 
-export class Category extends BaseModel {
+export class Category extends BaseModel implements Searchable {
   private _name: string;
   private _description: string;
 
@@ -24,6 +25,13 @@ export class Category extends BaseModel {
   }
 
   set description(value: string) { this._description = value.trim(); }
+
+  // Implementasi Searchable
+  matches(keyword: string): boolean {
+    const lower = keyword.toLowerCase();
+    return this._name.toLowerCase().includes(lower) ||
+      this._description.toLowerCase().includes(lower);
+  }
 
   override toString(): string {
     return `[Category#${this.id}] ${this._name}`;

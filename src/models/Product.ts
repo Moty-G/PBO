@@ -1,6 +1,8 @@
 import { BaseModel } from "./BaseModel.js";
+import { Displayable } from "../interfaces/Displayable.js";
+import { Searchable } from "../interfaces/Searchable.js";
 
-export class Product extends BaseModel {
+export class Product extends BaseModel implements Displayable, Searchable {
   private _sku: string;
   private _name: string;
   private _price: number;
@@ -18,8 +20,7 @@ export class Product extends BaseModel {
     categoryId: number,
     description: string = ""
   ) {
-    super(id); // Memanggil constructor BaseModel WAJIB pertama
-
+    super(id);
     if (sku.trim().length == 0) throw new Error("SKU tidak boleh kosong");
     if (name.trim().length == 0) throw new Error("Nama produk tidak boleh kosong");
     if (price <= 0) throw new Error("Harga harus lebih dari 0");
@@ -80,10 +81,35 @@ export class Product extends BaseModel {
   activate(): void { this._isActive = true; }
   deactivate(): void { this._isActive = false; }
 
-  // Override toString() dari BaseModel
+  // Implementasi Displayable
+  toDisplayString(): string {
+    return `${this._sku} - ${this._name}`;
+  }
+
+  toDetailString(): string {
+    const stockWarning = this.isLowStock ? " (LOW STOCK)" : "";
+    return [
+      `ID: ${this.id}`,
+      `SKU: ${this.sku}`,
+      `Nama: ${this._name}`,
+      `Harga: Rp ${this._price.toLocaleString("id-ID")}`,
+      `Stok: ${this._stock}${stockWarning}`,
+      `Kategori: #${this._categoryId}`,
+      `Deskripsi: ${this.description}`,
+      `Status: ${this.isActive ? "Active" : "Inactive"}`,
+      `Dibuat: ${this.createdAt.toLocaleString("id-ID")}`
+    ].join("\n");
+  }
+
+  // Implementasi Searchable
+  matches(keyword: string): boolean {
+    const lower = keyword.toLowerCase();
+    return this._name.toLowerCase().includes(lower) ||
+      this._sku.toLowerCase().includes(lower) ||
+      this._description.toLowerCase().includes(lower);
+  }
+
   override toString(): string {
-    const status = this._isActive ? "Active" : "Inactive";
-    const stockWarning = this.isLowStock ? " LOW STOCK" : "";
-    return `[Product#${this.id}] ${this._sku} ${this._name} | Rp ${this._price.toLocaleString("id-ID")} | Stok: ${this._stock}${stockWarning} (${status})`;
+    return this.toDisplayString();
   }
 }
