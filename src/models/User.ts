@@ -57,6 +57,11 @@ export class User extends BaseModel {
     return false;
   }
 
+  /** Mengembalikan daftar fitur yang bisa diakses. Di-override oleh subclass. */
+  getPermissionList(): string[] {
+    return [];
+  }
+
   override toString(): string {
     const status = this._isActive ? "Active" : "Inactive";
     return `[${this.getRole()}#${this.id}] ${this._username} (${this._fullName}) | ${status}`;

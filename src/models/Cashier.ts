@@ -20,4 +20,9 @@ export class Cashier extends User {
     override hasAccess(feature: string): boolean {
         return Cashier.ALLOWED_FEATURES.includes(feature);
     }
+
+    /** Mengembalikan daftar fitur yang bisa diakses Cashier. */
+    override getPermissionList(): string[] {
+        return [...Cashier.ALLOWED_FEATURES];
+    }
 }
