@@ -35,4 +35,10 @@ export interface PaymentStrategy {
      * @returns true jika pembayaran valid/bisa dilakukan
      */
     validatePayment(amount: number): boolean;
+
+    /**
+     * Mengembalikan ringkasan informasi payment method.
+     * @returns String berisi detail payment method
+     */
+    getPaymentSummary(): string;
 }
