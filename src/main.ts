@@ -1,121 +1,107 @@
-import { PaymentStrategy } from "./interfaces/PaymentStrategy.js";
-import { CashPayment } from "./strategies/CashPayment.js";
-import { QRISPayment } from "./strategies/QRISPayment.js";
-import { TransferPayment } from "./strategies/TransferPayment.js";
-import { PaymentFactory } from "./strategies/PaymentFactory.js";
+import { seedCategories, seedProducts, seedTransactions } from "./data/SeedData.js";
+import { SalesReport } from "./reports/SalesReport.js";
+import { ProductAnalytics } from "./reports/ProductAnalytics.js";
 
-const AMOUNT = 35_000; // Rp 35.000 jumlah yang akan dibayar
+// === SEED DATA ===
+const categories = seedCategories();
+const products = seedProducts();
+const transactions = seedTransactions();
 
-console.log("=== TEST INDIVIDUAL PAYMENT ===\n");
+console.log(`Loaded: ${categories.length} categories, ${products.length} products, ${transactions.length} transactions\n`);
 
-// 1. Cash uang cukup
-const cash = new CashPayment(50_000);
-const cashResult = cash.processPayment(AMOUNT);
-console.log(`[${cash.methodName}] ${cashResult.message}`);
-console.log(`Code: ${cashResult.transactionCode}`);
-console.log(`Kembalian: Rp ${cashResult.changeAmount?.toLocaleString("id-ID")}`);
+// === SALES REPORT ===
+console.log("=== SALES REPORT ===\n");
 
-// 2. Cash uang tidak cukup
-console.log();
-const cashInsufficient = new CashPayment(20_000);
-const failResult = cashInsufficient.processPayment(AMOUNT);
-console.log(`[${cashInsufficient.methodName}] ${failResult.message}`);
-console.log(`Success: ${failResult.success}`);
+const salesReport = new SalesReport(transactions);
 
-// 3. QRIS
-console.log();
-const qris = new QRISPayment();
-const qrisResult = qris.processPayment(AMOUNT);
-console.log(`[${qris.methodName}] ${qrisResult.message}`);
+// Total Revenue
+console.log(`Total Revenue: Rp ${salesReport.totalRevenue().toLocaleString("id-ID")}`);
+console.log(`Successful Transactions: ${salesReport.successfulTransactionCount()}`);
 
-// 4. Transfer
-console.log();
-const transfer = new TransferPayment("BNI");
-const transferResult = transfer.processPayment(AMOUNT);
-console.log(`[${transfer.methodName}] ${transferResult.message}`);
-
-// === POLYMORPHISM IN ACTION ===
-console.log("\n=== POLYMORPHISM IN ACTION ===\n");
-
-// Array bertipe PaymentStrategy[]
-// bisa berisi class apapun yang implements PaymentStrategy
-const strategies: PaymentStrategy[] = [
-  PaymentFactory.create("CASH", { cashReceived: 50_000 }),
-  PaymentFactory.create("QRIS"),
-  PaymentFactory.create("TRANSFER", { bankName: "MANDIRI" }),
-];
-
-// Loop panggil processPayment() secara polymorphic
-// Kita TIDAK TAHU concrete type setiap element, tapi TAHU pasti punya processPayment()
-for (const strategy of strategies) {
-  const result = strategy.processPayment(AMOUNT);
-  const status = result.success ? "✅" : "❌";
-  console.log(`${status} [${strategy.methodName.padEnd(10)}] ${result.message}`);
+// Revenue by Payment Method
+console.log("\nRevenue by Payment Method:");
+const revenueByMethod = salesReport.revenueByPaymentMethod();
+for (const [method, revenue] of revenueByMethod) {
+  console.log(`- ${method.padEnd(10)}: Rp ${revenue.toLocaleString("id-ID")}`);
 }
 
-// === FACTORY PATTERN ===
-console.log("\n=== FACTORY PATTERN ===\n");
-
-console.log("Available methods:", PaymentFactory.getAvailableMethods().join(", "));
-
-// Simulasi: user memilih payment method (input dari console)
-const userChoices = [
-  { method: "CASH", options: { cashReceived: 100_000 } },
-  { method: "QRIS", options: {} },
-  { method: "TRANSFER", options: { bankName: "BCA" } },
-];
-
-for (const choice of userChoices) {
-  const strategy = PaymentFactory.create(choice.method, choice.options);
-  const result = strategy.processPayment(75_000);
-  console.log(`\nPayment: ${strategy.methodName}`);
-  console.log(`Result: ${result.message}`);
-  console.log(`Code: ${result.transactionCode}`);
+// Top Selling Products
+console.log("\nTop 5 Selling Products:");
+const topProducts = salesReport.topSellingProducts(5);
+for (const [i, product] of topProducts.entries()) {
+  console.log(
+    `${i + 1}. ${product.productName.padEnd(20)} | ` +
+    `Qty: ${String(product.qtySold).padStart(3)} | ` +
+    `Revenue: Rp ${product.revenue.toLocaleString("id-ID")}`
+  );
 }
 
-// Test unknown payment method
-try {
-  PaymentFactory.create("BITCOIN");
-} catch (err) {
-  console.log(`\nError (expected): ${(err as Error).message}`);
+// Daily Summary
+console.log("\nDaily Summary (2026-02-01):");
+const feb1 = salesReport.dailySummary("2026-02-01");
+console.log(`- Transactions: ${feb1.count}`);
+console.log(`- Revenue: Rp ${feb1.revenue.toLocaleString("id-ID")}`);
+
+// Daily Revenue
+console.log("\nDaily Revenue:");
+const dailyRevenue = salesReport.dailyRevenue();
+for (const [date, revenue] of dailyRevenue) {
+  const bar = "█".repeat(Math.round(revenue / 10_000));
+  console.log(`- ${date} | Rp ${String(revenue.toLocaleString("id-ID")).padStart(10)} | ${bar}`);
 }
 
-// === POLYMORPHISM POWER ===
-console.log("\n=== POLYMORPHISM POWER ===\n");
+// CSV Export
+console.log("\nCSV Export (first 5 lines):");
+const csv = salesReport.exportToCSV();
+const csvLines = csv.split("\n");
+for (const line of csvLines.slice(0, 6)) {
+  console.log(line);
+}
 
-/**
- * Fungsi ini menerima PaymentStrategy (interface), bukan concrete type.
- * Bisa dipakai untuk payment method APAPUN sekarang dan di masa depan.
- * Ini adalah kekuatan polymorphism: kode yang terbuka untuk extension.
- */
-function processCheckout(
-  items: { name: string; price: number; qty: number }[],
-  strategy: PaymentStrategy
-): void {
-  console.log("--- RECEIPT ---");
-  let total = 0;
-  for (const item of items) {
-    const subtotal = item.price * item.qty;
-    console.log(`${item.name} x${item.qty} = Rp ${subtotal.toLocaleString("id-ID")}`);
-    total += subtotal;
+// === PRODUCT ANALYTICS ===
+console.log("\n=== PRODUCT ANALYTICS ===\n");
+
+const analytics = new ProductAnalytics(products);
+
+// Summary
+const summary = analytics.getSummary();
+console.log("Product Summary:");
+console.log(`- Total Products: ${summary.totalProducts}`);
+console.log(`- Active Products: ${summary.activeProducts}`);
+console.log(`- Total Stock Value: Rp ${summary.totalStockValue.toLocaleString("id-ID")}`);
+console.log(`- Average Price: Rp ${summary.averagePrice.toLocaleString("id-ID")}`);
+console.log(`- Low Stock Count: ${summary.lowStockCount}`);
+
+// Low Stock
+console.log("\nLow Stock Products:");
+const lowStock = analytics.getLowStockProducts();
+for (const p of lowStock) {
+  console.log(`- [${p.sku}] ${p.name}: ${p.stock} remaining`);
+}
+
+// By Category
+console.log("\nProducts by Category:");
+const byCategory = analytics.getByCategory();
+for (const [catId, prods] of byCategory) {
+  const catName = categories.find(c => c.id === catId)?.name ?? "Unknown";
+  console.log(`[${catName}]`);
+  for (const p of prods) {
+    console.log(`  - ${p.name} (Rp ${p.price.toLocaleString("id-ID")})`);
   }
-
-  console.log(`TOTAL: Rp ${total.toLocaleString("id-ID")}`);
-
-  const result = strategy.processPayment(total);
-  console.log(`Payment [${strategy.methodName}]: ${result.success ? "SUCCESS" : "FAILED"}`);
-  console.log(`${result.message}`);
-  console.log("--- END ---\n");
 }
 
-const sampleItems = [
-  { name: "Nasi Goreng", price: 15_000, qty: 2 },
-  { name: "Teh Botol", price: 5_000, qty: 3 },
-];
+// Most Expensive
+console.log("\nTop 3 Most Expensive Products:");
+const expensive = analytics.getMostExpensive(3);
+for (const p of expensive) {
+  console.log(`- ${p.name}: Rp ${p.price.toLocaleString("id-ID")}`);
+}
 
-// Proses checkout yang SAMA, tapi payment method BERBEDA
-processCheckout(sampleItems, PaymentFactory.create("CASH", { cashReceived: 50_000 }));
-processCheckout(sampleItems, PaymentFactory.create("QRIS"));
-processCheckout(sampleItems, PaymentFactory.create("TRANSFER"));
+// Search
+console.log("\nSearch 'nasi':");
+const searchResults = analytics.searchProducts("nasi");
+for (const p of searchResults) {
+  console.log(`- [${p.sku}] ${p.name}`);
+}
 
-console.log("=== SEMUA TEST SELESAI ===");
+console.log("\n=== SEMUA TEST SELESAI ===");
